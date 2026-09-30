@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/app/lib/supabase/client";
 
 export default function OrganizationRegisterPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,13 +32,13 @@ export default function OrganizationRegisterPage() {
       formData.get("contactPerson") || ""
     ).trim();
 
-    const email = String(formData.get("email") || "").trim();
+    const email = String(formData.get("email") || "")
+      .trim()
+      .toLowerCase();
 
     const phone = String(formData.get("phone") || "").trim();
 
-    const address = String(
-      formData.get("address") || ""
-    ).trim();
+    const address = String(formData.get("address") || "").trim();
 
     const peopleServed = String(
       formData.get("peopleServed") || ""
@@ -51,6 +49,10 @@ export default function OrganizationRegisterPage() {
     const password = String(formData.get("password") || "");
 
     const terms = formData.get("terms");
+
+    // -----------------------------
+    // VALIDATION
+    // -----------------------------
 
     if (
       !organizationName ||
@@ -78,103 +80,62 @@ export default function OrganizationRegisterPage() {
       return;
     }
 
+    // -----------------------------
+    // SEND DATA TO BACKEND
+    // -----------------------------
+
     try {
-      // 1. Create Supabase auth account
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: contactPerson,
-            role: "organization",
-            phone,
-          },
+      const response = await fetch("/api/organization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      });
-
-      if (signUpError) {
-        throw signUpError;
-      }
-
-      if (!data.user) {
-        throw new Error("Could not create your account.");
-      }
-
-      // 2. Create profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: data.user.id,
-          full_name: contactPerson,
-          phone,
-          role: "organization",
-        });
-
-      if (profileError) {
-        throw profileError;
-      }
-
-      // 3. Create organization profile
-      const { error: organizationError } = await supabase
-        .from("organizations")
-        .insert({
-          id: data.user.id,
-          organization_name: organizationName,
-          organization_type: organizationType,
-          contact_person: contactPerson,
+        body: JSON.stringify({
+          organizationName,
+          organizationType,
+          contactPerson,
           email,
           phone,
           address,
-          people_served: peopleServed
+          peopleServed: peopleServed
             ? Number(peopleServed)
             : null,
-          food_preferences: foodPreferences,
-        });
+          foodPreferences,
+          password,
+        }),
+      });
 
-      if (organizationError) {
-        throw organizationError;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Registration failed. Please try again."
+        );
       }
 
-      setSuccess(
-        "Registration successful. Redirecting..."
-      );
+      setSuccess("Registration successful. Redirecting...");
 
       setTimeout(() => {
         router.push("/organization/dashboard");
       }, 1000);
     } catch (err) {
-  console.error("ORGANIZATION REGISTRATION ERROR:", err);
+      console.error("ORGANIZATION REGISTRATION ERROR:", err);
 
-  let message = "Something went wrong. Please try again.";
-
-  if (err && typeof err === "object") {
-    const errorObject = err as {
-      message?: string;
-      details?: string;
-      hint?: string;
-      code?: string;
-    };
-
-    message =
-      errorObject.message ||
-      errorObject.details ||
-      errorObject.hint ||
-      message;
-
-    if (errorObject.code) {
-      message += ` (Code: ${errorObject.code})`;
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
-  } else if (err instanceof Error) {
-    message = err.message;
-  }
-
-  setError(message);
-}
   }
 
   return (
     <main className="min-h-screen bg-black px-6 py-16 text-white">
       <div className="mx-auto max-w-2xl">
+
+        {/* Back */}
         <Link
           href="/get-started"
           className="text-sm text-white/50 transition hover:text-white"
@@ -182,6 +143,7 @@ export default function OrganizationRegisterPage() {
           ← Back
         </Link>
 
+        {/* Header */}
         <div className="mt-12">
           <p className="text-sm uppercase tracking-[0.25em] text-white/40">
             FoodBridge
@@ -197,10 +159,13 @@ export default function OrganizationRegisterPage() {
           </p>
         </div>
 
+        {/* Form */}
         <form
           onSubmit={handleSubmit}
           className="mt-12 space-y-8"
         >
+
+          {/* Organization Name */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Organization name *
@@ -215,6 +180,7 @@ export default function OrganizationRegisterPage() {
             />
           </div>
 
+          {/* Organization Type */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Organization type *
@@ -243,6 +209,7 @@ export default function OrganizationRegisterPage() {
             </select>
           </div>
 
+          {/* Contact Person */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Contact person *
@@ -257,7 +224,9 @@ export default function OrganizationRegisterPage() {
             />
           </div>
 
+          {/* Email + Phone */}
           <div className="grid gap-6 md:grid-cols-2">
+
             <div>
               <label className="mb-2 block text-sm text-white/60">
                 Email *
@@ -285,8 +254,10 @@ export default function OrganizationRegisterPage() {
                 className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4 outline-none transition placeholder:text-white/20 focus:border-white/30"
               />
             </div>
+
           </div>
 
+          {/* Address */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Address *
@@ -301,6 +272,7 @@ export default function OrganizationRegisterPage() {
             />
           </div>
 
+          {/* People Served */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Approx. number of people served
@@ -315,18 +287,21 @@ export default function OrganizationRegisterPage() {
             />
           </div>
 
+          {/* Food Preferences */}
           <div>
             <p className="mb-4 text-sm text-white/60">
               Food preferences
             </p>
 
             <div className="grid gap-3 sm:grid-cols-3">
+
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
                 <input
                   type="checkbox"
                   name="foodPreferences"
                   value="vegetarian"
                 />
+
                 <span className="text-sm">
                   Vegetarian
                 </span>
@@ -338,6 +313,7 @@ export default function OrganizationRegisterPage() {
                   name="foodPreferences"
                   value="non_vegetarian"
                 />
+
                 <span className="text-sm">
                   Non-vegetarian
                 </span>
@@ -349,13 +325,16 @@ export default function OrganizationRegisterPage() {
                   name="foodPreferences"
                   value="both"
                 />
+
                 <span className="text-sm">
                   Both
                 </span>
               </label>
+
             </div>
           </div>
 
+          {/* Password */}
           <div>
             <label className="mb-2 block text-sm text-white/60">
               Password *
@@ -371,11 +350,13 @@ export default function OrganizationRegisterPage() {
             />
           </div>
 
+          {/* Verification Notice */}
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/50">
             Your organization may need to be verified by FoodBridge
             before receiving donations.
           </div>
 
+          {/* Terms */}
           <label className="flex cursor-pointer items-start gap-3 text-sm text-white/50">
             <input
               name="terms"
@@ -389,18 +370,21 @@ export default function OrganizationRegisterPage() {
             </span>
           </label>
 
+          {/* Error */}
           {error && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
               {error}
             </div>
           )}
 
+          {/* Success */}
           {success && (
             <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-300">
               {success}
             </div>
           )}
 
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
@@ -411,8 +395,10 @@ export default function OrganizationRegisterPage() {
               : "Register organization →"}
           </button>
 
+          {/* Login */}
           <p className="text-center text-sm text-white/40">
             Already registered?{" "}
+
             <Link
               href="/login"
               className="text-white underline underline-offset-4"
@@ -420,6 +406,7 @@ export default function OrganizationRegisterPage() {
               Sign in
             </Link>
           </p>
+
         </form>
       </div>
     </main>

@@ -50,17 +50,19 @@ export default function OrganizerRegisterPage() {
     }
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: "organizer",
-            phone,
+      // Create Supabase Auth account
+      const { data, error: signUpError } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: "organizer",
+              phone,
+            },
           },
-        },
-      });
+        });
 
       if (signUpError) {
         throw signUpError;
@@ -70,19 +72,14 @@ export default function OrganizerRegisterPage() {
         throw new Error("Could not create your account.");
       }
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: data.user.id,
-          full_name: fullName,
-          phone,
-          role: "organizer",
-        });
+      /*
+       * DO NOT manually insert into profiles here.
+       *
+       * The Supabase database trigger automatically creates
+       * the profiles row when the auth user is created.
+       */
 
-      if (profileError) {
-        throw profileError;
-      }
-
+      // Create organizer-specific profile
       const { error: organizerError } = await supabase
         .from("organizer_profiles")
         .insert({
@@ -94,6 +91,17 @@ export default function OrganizerRegisterPage() {
         throw organizerError;
       }
 
+      // If email confirmation is enabled
+      if (!data.session) {
+        setSuccess(
+          "Account created! Please check your email to confirm your account."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // If email confirmation is disabled
       setSuccess(
         "Account created successfully. Redirecting to your dashboard..."
       );
@@ -102,33 +110,34 @@ export default function OrganizerRegisterPage() {
         router.push("/organizer/dashboard");
       }, 1000);
     } catch (err) {
-  console.error("ORGANIZER REGISTRATION ERROR:", err);
+      console.error("ORGANIZER REGISTRATION ERROR:", err);
 
-  let message = "Something went wrong. Please try again.";
+      let message = "Something went wrong. Please try again.";
 
-  if (err && typeof err === "object") {
-    const errorObject = err as {
-      message?: string;
-      details?: string;
-      hint?: string;
-      code?: string;
-    };
+      if (err && typeof err === "object") {
+        const errorObject = err as {
+          message?: string;
+          details?: string;
+          hint?: string;
+          code?: string;
+        };
 
-    message =
-      errorObject.message ||
-      errorObject.details ||
-      errorObject.hint ||
-      message;
+        message =
+          errorObject.message ||
+          errorObject.details ||
+          errorObject.hint ||
+          message;
 
-    if (errorObject.code) {
-      message += ` (Code: ${errorObject.code})`;
+        if (errorObject.code) {
+          message += ` (Code: ${errorObject.code})`;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      setError(message);
+      setLoading(false);
     }
-  } else if (err instanceof Error) {
-    message = err.message;
-  }
-
-  setError(message);
-}
   }
 
   return (
@@ -294,7 +303,9 @@ export default function OrganizerRegisterPage() {
               disabled={loading}
               className="group mt-6 flex w-full items-center justify-center gap-4 rounded-full bg-white px-8 py-5 text-sm font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Creating account..." : "Create organizer account"}
+              {loading
+                ? "Creating account..."
+                : "Create organizer account"}
 
               {!loading && (
                 <span className="text-lg transition-transform duration-300 group-hover:translate-x-1">
