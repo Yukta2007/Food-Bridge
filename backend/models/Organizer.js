@@ -1,15 +1,6 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose from "mongoose";
 
-export interface IOrganizer extends Document {
-  fullName: string;
-  email: string;
-  phone: string;
-  eventCompany?: string | null;
-  password: string;
-  createdAt: Date;
-}
-
-const OrganizerSchema = new Schema<IOrganizer>(
+const OrganizerSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
@@ -49,6 +40,6 @@ const OrganizerSchema = new Schema<IOrganizer>(
 
 const Organizer =
   mongoose.models.Organizer ||
-  mongoose.model<IOrganizer>("Organizer", OrganizerSchema);
+  mongoose.model("Organizer", OrganizerSchema);
 
 export default Organizer;
